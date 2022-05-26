@@ -7,6 +7,7 @@ const app = express()
 const jwt = require('jsonwebtoken');
 app.use(cors()) //
 app.use(express.json()) //for parse
+const stripe = require('stripe')(process.env.STRIPE_KEY);
 
 app.get('/', (req, res) => {
     res.send('Welcome To Manufacture Server')
@@ -48,15 +49,28 @@ async function run() {
                 res.status(403).send({ message: 'forbidden' });
             }
         }
-        //user entry
-    
+        //payment
+        app.post('/create-payment-intent', verifyJWT, async(req, res) =>{
+            const service = req.body;
+            const price = service.price;
+            const amount = price*100;
+            const paymentIntent = await stripe.paymentIntents.create({
+              amount : amount,
+              currency: 'usd',
+              payment_method_types:['card']
+            });
+            res.send({clientSecret: paymentIntent.client_secret})
+          });
+
+
+        //Review Post
         app.post('/review-post', verifyJWT, async (req, res) => {
             const review = req.body
             const result = await reviews.insertOne(review);
             res.send({ success: 'Added review Successfully' })
         })
-        
-        //get
+
+        //Review Get
         app.get('/review-get', async (req, res) => {
             const query = {}
             const cursor = reviews.find(query)
@@ -64,21 +78,21 @@ async function run() {
             res.send(result)
         })
 
-        
-        //
+
+        //My Profile get
         app.get('/profile-get', verifyJWT, async (req, res) => {
             const email = req.query.email;
             const decodedEmail = req.decoded.email;
             if (email === decodedEmail) {
-              const query = { email: email };
-              const bookings = await userprifile.find(query).toArray();
-              return res.send(bookings);
+                const query = { email: email };
+                const bookings = await userprifile.find(query).toArray();
+                return res.send(bookings);
             }
             else {
-              return res.status(403).send({ message: 'forbidden access' });
+                return res.status(403).send({ message: 'forbidden access' });
             }
-          });
-
+        });
+        //My Profile Post
         app.post('/profile-post', verifyJWT, async (req, res) => {
             const submit = req.body;
             const query = {
@@ -100,61 +114,63 @@ async function run() {
             return res.send({ success: true, result });
         })
 
-        //product
+        //Add Product
         app.post('/product-post', async (req, res) => {
             const productPost = req.body
             const result = await product.insertOne(productPost);
             res.send({ success: 'Added Product Successfully' })
         })
+        //Display Product
         app.get('/product-get', async (req, res) => {
             const query = {}
             const cursor = product.find(query)
             const result = await cursor.toArray()
             res.send(result)
         })
+        //Delete Product from Display and database
         app.delete('/product-del/:id', async (req, res) => {
             const id = req.params.id
             const query = { _id: ObjectId(id) }
             const result = await product.deleteOne(query)
             res.send(result)
         })
-        //user
+        //Login Display
         app.get('/user', async (req, res) => {
             const users = await userlogin.find().toArray();
             res.send(users);
-          });
-      
-          app.get('/admin/:email', async (req, res) => {
+        });
+
+        app.get('/admin/:email', async (req, res) => {
             const email = req.params.email;
             const user = await userlogin.findOne({ email: email });
             const isAdmin = user.role === 'admin';
             res.send({ admin: isAdmin })
-          })
-      
-          //make admin
-          app.put('/user/admin/:email',verifyJWT, async  (req, res) => {
+        })
+
+        //make admin
+        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
             const filter = { email: email };
             const updateDoc = {
-              $set: { role: 'admin' },
+                $set: { role: 'admin' },
             };
             const result = await userlogin.updateOne(filter, updateDoc);
             res.send(result);
-          })
-          
-          //login time
-          app.put('/user/:email', async (req, res) => {
+        })
+
+        //login time
+        app.put('/user/:email', async (req, res) => {
             const email = req.params.email;
             const user = req.body;
             const filter = { email: email };
             const options = { upsert: true };
             const updateDoc = {
-              $set: user,
+                $set: user,
             };
             const result = await userlogin.updateOne(filter, updateDoc, options);
             const token = jwt.sign({ email: email }, process.env.VALID_TOKEN, { expiresIn: '1h' })
             res.send({ result, token });
-          });
+        });
     }
     finally {
         //await client.close()
