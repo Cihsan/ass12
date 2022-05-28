@@ -38,6 +38,7 @@ async function run() {
         const userprifile = client.db("prifileDB").collection("prifileCollection");
         const userlogin = client.db("userLoginDB").collection("userLoginCollection");
         const product = client.db("productDB").collection("productCollection");
+        const orders = client.db("orderDB").collection("orderCollection");
 
         const verifyAdmin = async (req, res, next) => {
             const requester = req.decoded.email;
@@ -50,18 +51,80 @@ async function run() {
             }
         }
         //payment
-        app.post('/create-payment-intent', verifyJWT, async(req, res) =>{
+
+        app.post('/create-payment-intent', async (req, res) => {
             const service = req.body;
             const price = service.price;
-            const amount = price*100;
+            const amount = price * 100;
             const paymentIntent = await stripe.paymentIntents.create({
-              amount : amount,
-              currency: 'usd',
-              payment_method_types:['card']
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
             });
-            res.send({clientSecret: paymentIntent.client_secret})
-          });
+            res.send({ clientSecret: paymentIntent.client_secret })
+        });
 
+        /* app.patch('/order/:id', async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+
+            const result = await orders.insertOne(payment);
+            const updatedBooking = await orders.updateOne(filter, updatedDoc);
+            res.send(updatedBooking);
+        })
+         */
+        app.post('/order/:id', async (req, res) => {
+            const order = req.body
+            const result = await orders.insertOne(order);
+            res.send({ success: 'Payment Successfully Done' })
+        })
+
+        app.get('/order', async (req, res) => {
+            const query = {}
+            const cursor = orders.find(query)
+            const result = await cursor.toArray()
+            res.send(result)
+        })
+        app.put('/order-status/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const updateDoc = {
+                $set: { status: 'Paid' },
+            };
+            const result = await orders.updateOne(filter, updateDoc);
+            res.send(result);
+        })
+        app.delete('/order-status/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const result = await orders.deleteOne(query)
+            res.send(result)
+        })
+        /* app.get('/order/:email', async (req, res) => {
+            const email = req.query.email
+            const query = { email: email }
+            const result = await orders.find(query)
+            res.send(result)
+        }) */
+        /* app.get('/order', async (req, res) => {
+            const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+            if (email === decodedEmail) {
+                const query = { email: email };
+                const bookings = await orders.find(query).toArray();
+                return res.send(bookings);
+            }
+            else {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+        }); */
 
         //Review Post
         app.post('/review-post', verifyJWT, async (req, res) => {
