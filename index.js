@@ -39,6 +39,7 @@ async function run() {
         const userlogin = client.db("userLoginDB").collection("userLoginCollection");
         const product = client.db("productDB").collection("productCollection");
         const orders = client.db("orderDB").collection("orderCollection");
+        const myProject = client.db("projects").collection("projectsCollection");
 
         const verifyAdmin = async (req, res, next) => {
             const requester = req.decoded.email;
@@ -80,6 +81,24 @@ async function run() {
             res.send(updatedBooking);
         })
          */
+
+        //myprojects
+        app.get('/my-projects', async (req, res) => {
+            const query = {}
+            const cursor = myProject.find(query)
+            const result = await cursor.toArray()
+            res.send(result)
+        })
+        
+        app.get('/my-projects/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const result = await myProject.findOne(query)
+            res.send(result)
+        })
+        
+        // order
+
         app.post('/order/:id', async (req, res) => {
             const order = req.body
             const result = await orders.insertOne(order);
